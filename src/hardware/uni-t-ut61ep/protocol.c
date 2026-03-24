@@ -264,6 +264,20 @@ static gboolean value_is_ol(const char *s, int len)
 	return FALSE;
 }
 
+static void compact_value(char *s)
+{
+	char buf[UT61EP_DATA_LEN + 1];
+	int i, j;
+
+	/* Remove internal spaces: "- 7.677" → "-7.677", "  7.677" → "7.677" */
+	for (i = 0, j = 0; s[i] && j < UT61EP_DATA_LEN; i++) {
+		if (s[i] != ' ')
+			buf[j++] = s[i];
+	}
+	buf[j] = '\0';
+	strcpy(s, buf);
+}
+
 static int decode_packet(struct sr_dev_inst *sdi, const uint8_t *buf)
 {
 	struct dev_context *devc;
@@ -289,11 +303,18 @@ static int decode_packet(struct sr_dev_inst *sdi, const uint8_t *buf)
 	        buf[UT61EP_UNIT_OFFSET], buf[UT61EP_RANGE_OFFSET],
 	        valstr, buf[UT61EP_FLAGS1_OFFSET], buf[UT61EP_FLAGS2_OFFSET]);
 
+	/*
+	 * Compact the value string: remove spaces between sign and digits.
+	 * The meter sends e.g. "- 7.677" which strtod() cannot parse.
+	 * Compact to "-7.677".
+	 */
+	compact_value(valstr);
+
 	parse_unit(buf[UT61EP_UNIT_OFFSET], &mq, &unit, &mqflags, &exponent);
 
 	/* Check for overload — flags1 bit2 or "OL" in value string */
 	if ((buf[UT61EP_FLAGS1_OFFSET] & UT61EP_FLAG1_OL) ||
-	    value_is_ol(valstr, UT61EP_DATA_LEN)) {
+	    value_is_ol(valstr, strlen(valstr))) {
 		sr_spew("Overload detected.");
 		floatval = INFINITY;
 		digits = 0;

@@ -39,7 +39,7 @@ static const uint32_t devopts[] = {
 	SR_CONF_CONTINUOUS,
 	SR_CONF_LIMIT_SAMPLES | SR_CONF_SET | SR_CONF_GET,
 	SR_CONF_LIMIT_MSEC | SR_CONF_SET | SR_CONF_GET,
-	SR_CONF_SAMPLERATE | SR_CONF_GET,
+	SR_CONF_SAMPLERATE | SR_CONF_GET | SR_CONF_SET | SR_CONF_LIST,
 };
 
 static GSList *scan(struct sr_dev_driver *di, GSList *options)
@@ -141,6 +141,8 @@ static int dev_close(struct sr_dev_inst *sdi)
 	return SR_OK;
 }
 
+static const uint64_t samplerate = 2;
+
 static int config_get(uint32_t key, GVariant **data,
 	const struct sr_dev_inst *sdi, const struct sr_channel_group *cg)
 {
@@ -155,8 +157,7 @@ static int config_get(uint32_t key, GVariant **data,
 
 	switch (key) {
 	case SR_CONF_SAMPLERATE:
-		/* Fixed ~2 samples/sec polling rate */
-		*data = g_variant_new_uint64(2);
+		*data = g_variant_new_uint64(samplerate);
 		return SR_OK;
 	default:
 		return sr_sw_limits_config_get(&devc->limits, key, data);
@@ -172,13 +173,25 @@ static int config_set(uint32_t key, GVariant *data,
 
 	devc = sdi->priv;
 
-	return sr_sw_limits_config_set(&devc->limits, key, data);
+	switch (key) {
+	case SR_CONF_SAMPLERATE:
+		/* Fixed rate, accept but ignore */
+		return SR_OK;
+	default:
+		return sr_sw_limits_config_set(&devc->limits, key, data);
+	}
 }
 
 static int config_list(uint32_t key, GVariant **data,
 	const struct sr_dev_inst *sdi, const struct sr_channel_group *cg)
 {
-	return STD_CONFIG_LIST(key, data, sdi, cg, scanopts, drvopts, devopts);
+	switch (key) {
+	case SR_CONF_SAMPLERATE:
+		*data = std_gvar_samplerates(&samplerate, 1);
+		return SR_OK;
+	default:
+		return STD_CONFIG_LIST(key, data, sdi, cg, scanopts, drvopts, devopts);
+	}
 }
 
 static int dev_acquisition_start(const struct sr_dev_inst *sdi)
