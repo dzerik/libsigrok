@@ -70,7 +70,6 @@ static GSList *scan(struct sr_dev_driver *di, GSList *options)
 	for (l = usb_devices; l; l = l->next) {
 		usb = l->data;
 		devc = g_malloc0(sizeof(struct dev_context));
-		devc->first_run = TRUE;
 		sdi = g_malloc0(sizeof(struct sr_dev_inst));
 		sdi->status = SR_ST_INACTIVE;
 		sdi->vendor = g_strdup("UNI-T");
@@ -100,7 +99,6 @@ static int dev_open(struct sr_dev_inst *sdi)
 	if (ret != SR_OK)
 		return ret;
 
-	/* Detach kernel driver (hid-generic) so we can claim the interface */
 	if (libusb_kernel_driver_active(usb->devhdl, 0) == 1) {
 		ret = libusb_detach_kernel_driver(usb->devhdl, 0);
 		if (ret < 0) {
@@ -115,6 +113,23 @@ static int dev_open(struct sr_dev_inst *sdi)
 		       libusb_error_name(ret));
 		return SR_ERR;
 	}
+
+	return SR_OK;
+}
+
+static int dev_close(struct sr_dev_inst *sdi)
+{
+	struct sr_usb_dev_inst *usb;
+
+	usb = sdi->conn;
+
+	if (!usb || !usb->devhdl)
+		return SR_OK;
+
+	libusb_release_interface(usb->devhdl, 0);
+	libusb_attach_kernel_driver(usb->devhdl, 0);
+	libusb_close(usb->devhdl);
+	usb->devhdl = NULL;
 
 	return SR_OK;
 }
@@ -144,10 +159,8 @@ static int dev_acquisition_start(const struct sr_dev_inst *sdi)
 	devc = sdi->priv;
 
 	sr_sw_limits_acquisition_start(&devc->limits);
-
 	std_session_send_df_header(sdi);
 
-	/* Poll every 500ms — the meter updates ~2 times per second */
 	sr_session_source_add(sdi->session, -1, 0, 500,
 			ut61ep_receive_data, (void *)sdi);
 
@@ -175,7 +188,7 @@ static struct sr_dev_driver uni_t_ut61ep_driver_info = {
 	.config_set = config_set,
 	.config_list = config_list,
 	.dev_open = dev_open,
-	.dev_close = std_dummy_dev_close,
+	.dev_close = dev_close,
 	.dev_acquisition_start = dev_acquisition_start,
 	.dev_acquisition_stop = dev_acquisition_stop,
 	.context = NULL,

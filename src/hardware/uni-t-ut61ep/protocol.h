@@ -29,21 +29,25 @@
 #define LOG_PREFIX "uni-t-ut61ep"
 
 /*
- * UNI-T UT61E+ / UT161 series protocol.
+ * UNI-T UT61E+ / UT161 series protocol over WCH CH9329 USB/HID.
  *
- * These meters use a WCH CH9329 UART-to-USB/HID chip (VID:PID 1a86:e429)
- * which presents as a vendor-specific HID device with 64-byte reports.
+ * VID:PID 1a86:e429, vendor-specific HID (Usage Page 0xFFA0),
+ * 64-byte reports, no Report ID.
  *
- * Protocol:
- * - Send a 64-byte HID output report with magic bytes:
+ * Request (host -> device): 64 bytes via interrupt OUT EP4.
  *   [0x06, 0xab, 0xcd, 0x03, 0x5e, 0x01, 0xd9, 0x00...]
- *   The first byte (0x06) is consumed by hidraw as report-id-like prefix.
- * - Receive a 64-byte HID input report with measurement data:
- *   [0x13, 0xab, 0xcd, 0x10, UNIT, D0..D7, FLAGS..., CHECKSUM]
- *   Where:
- *     byte[4]    = unit code (0=VAC, 1=mVAC, 2=VDC, 3=mVDC, 4=Hz, etc.)
- *     byte[5..12]= ASCII measurement value (8 chars, e.g. " 0.0545" or "-7.792 ")
- *     byte[13..] = flags and status bytes
+ *
+ * Response (device -> host): 64 bytes via interrupt IN EP4.
+ *   Byte layout:
+ *     [0-3]   Header: 0x13 0xab 0xcd 0x10
+ *     [4]     Unit code (see UT61EP_UNIT_*)
+ *     [5]     Range indicator (ASCII digit)
+ *     [6-12]  Value: 7 ASCII chars including sign (e.g. " 7.720" or "-0.054")
+ *     [13]    Flags byte 1 (overload, battery)
+ *     [14]    Flags byte 2 (HOLD, REL, AUTO, MAX, MIN, PEAK)
+ *     [15-17] Status: 3 ASCII digits
+ *     [18]    Packet trailer (0x03)
+ *     [19]    Checksum
  */
 
 #define UT61EP_HID_REPORT_SIZE	64
@@ -52,11 +56,20 @@
 #define UT61EP_USB_VID		0x1a86
 #define UT61EP_USB_PID		0xe429
 
-/* Offsets in the response packet */
+/* Response packet offsets */
 #define UT61EP_UNIT_OFFSET	4
 #define UT61EP_RANGE_OFFSET	5
 #define UT61EP_DATA_OFFSET	6
 #define UT61EP_DATA_LEN		7
+#define UT61EP_FLAGS1_OFFSET	13
+#define UT61EP_FLAGS2_OFFSET	14
+#define UT61EP_STATUS_OFFSET	15
+#define UT61EP_STATUS_LEN	3
+
+/* Flags byte 2 (byte[14]) — observed bit fields */
+#define UT61EP_FLAG2_HOLD	(1 << 0)
+#define UT61EP_FLAG2_REL	(1 << 1)
+#define UT61EP_FLAG2_AUTO	(1 << 2)
 
 /* Unit codes */
 #define UT61EP_UNIT_V_AC	0
@@ -79,16 +92,14 @@
 #define UT61EP_UNIT_A_AC	17
 #define UT61EP_UNIT_NCV		20
 #define UT61EP_UNIT_LOZ_V	21
-#define UT61EP_UNIT_MAX		21
 
-/* Magic request command */
+/* Magic request command (7 bytes, padded to 64 with zeros) */
 static const uint8_t ut61ep_request_cmd[7] = {
 	0x06, 0xab, 0xcd, 0x03, 0x5e, 0x01, 0xd9
 };
 
 struct dev_context {
 	struct sr_sw_limits limits;
-	gboolean first_run;
 };
 
 SR_PRIV int ut61ep_receive_data(int fd, int revents, void *cb_data);
