@@ -28,6 +28,9 @@ static const uint32_t scanopts[] = {
 	SR_CONF_CONN,
 };
 
+/* Default USB connection string for WCH CH9329 */
+#define UT61EP_DEFAULT_CONN "1a86.e429"
+
 static const uint32_t drvopts[] = {
 	SR_CONF_MULTIMETER,
 };
@@ -36,6 +39,7 @@ static const uint32_t devopts[] = {
 	SR_CONF_CONTINUOUS,
 	SR_CONF_LIMIT_SAMPLES | SR_CONF_SET | SR_CONF_GET,
 	SR_CONF_LIMIT_MSEC | SR_CONF_SET | SR_CONF_GET,
+	SR_CONF_SAMPLERATE | SR_CONF_GET,
 };
 
 static GSList *scan(struct sr_dev_driver *di, GSList *options)
@@ -59,13 +63,16 @@ static GSList *scan(struct sr_dev_driver *di, GSList *options)
 			break;
 		}
 	}
-	if (!conn)
-		conn = "1a86.e429";
+	if (!conn || !conn[0])
+		conn = UT61EP_DEFAULT_CONN;
 
 	devices = NULL;
+	sr_dbg("UT61E+ scan: conn='%s'", conn);
 	usb_devices = sr_usb_find(drvc->sr_ctx->libusb_ctx, conn);
-	if (!usb_devices)
+	if (!usb_devices) {
+		sr_dbg("UT61E+ scan: no USB devices found.");
 		return NULL;
+	}
 
 	for (l = usb_devices; l; l = l->next) {
 		usb = l->data;
@@ -134,6 +141,28 @@ static int dev_close(struct sr_dev_inst *sdi)
 	return SR_OK;
 }
 
+static int config_get(uint32_t key, GVariant **data,
+	const struct sr_dev_inst *sdi, const struct sr_channel_group *cg)
+{
+	struct dev_context *devc;
+
+	(void)cg;
+
+	if (!sdi)
+		return SR_ERR_ARG;
+
+	devc = sdi->priv;
+
+	switch (key) {
+	case SR_CONF_SAMPLERATE:
+		/* Fixed ~2 samples/sec polling rate */
+		*data = g_variant_new_uint64(2);
+		return SR_OK;
+	default:
+		return sr_sw_limits_config_get(&devc->limits, key, data);
+	}
+}
+
 static int config_set(uint32_t key, GVariant *data,
 	const struct sr_dev_inst *sdi, const struct sr_channel_group *cg)
 {
@@ -184,7 +213,7 @@ static struct sr_dev_driver uni_t_ut61ep_driver_info = {
 	.scan = scan,
 	.dev_list = std_dev_list,
 	.dev_clear = std_dev_clear,
-	.config_get = NULL,
+	.config_get = config_get,
 	.config_set = config_set,
 	.config_list = config_list,
 	.dev_open = dev_open,
