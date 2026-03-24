@@ -215,6 +215,10 @@ static void parse_unit(uint8_t unit_code, enum sr_mq *mq,
 		*unit = SR_UNIT_AMPERE;
 		*mqflags = SR_MQFLAG_AC | SR_MQFLAG_RMS;
 		break;
+	case UT61EP_UNIT_CONT:
+		*mq = SR_MQ_CONTINUITY;
+		*unit = SR_UNIT_OHM;
+		break;
 	case UT61EP_UNIT_NCV:
 		*mq = SR_MQ_VOLTAGE;
 		*unit = SR_UNIT_VOLT;
@@ -287,8 +291,9 @@ static int decode_packet(struct sr_dev_inst *sdi, const uint8_t *buf)
 
 	parse_unit(buf[UT61EP_UNIT_OFFSET], &mq, &unit, &mqflags, &exponent);
 
-	/* Check for overload (OL) */
-	if (value_is_ol(valstr, UT61EP_DATA_LEN)) {
+	/* Check for overload — flags1 bit2 or "OL" in value string */
+	if ((buf[UT61EP_FLAGS1_OFFSET] & UT61EP_FLAG1_OL) ||
+	    value_is_ol(valstr, UT61EP_DATA_LEN)) {
 		sr_spew("Overload detected.");
 		floatval = INFINITY;
 		digits = 0;

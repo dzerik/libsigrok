@@ -80,7 +80,7 @@ static GSList *scan(struct sr_dev_driver *di, GSList *options)
 		sdi = g_malloc0(sizeof(struct sr_dev_inst));
 		sdi->status = SR_ST_INACTIVE;
 		sdi->vendor = g_strdup("UNI-T");
-		sdi->model = g_strdup("UT61E+");
+		sdi->model = g_strdup("UT61E+/UT161");
 		sdi->priv = devc;
 		sr_channel_new(sdi, 0, SR_CHANNEL_ANALOG, TRUE, "P1");
 		sdi->inst_type = SR_INST_USB;
@@ -206,7 +206,7 @@ static int dev_acquisition_stop(struct sr_dev_inst *sdi)
 
 static struct sr_dev_driver uni_t_ut61ep_driver_info = {
 	.name = "uni-t-ut61ep",
-	.longname = "UNI-T UT61E+",
+	.longname = "UNI-T UT61E+/UT161",
 	.api_version = 1,
 	.init = std_init,
 	.cleanup = std_cleanup,

@@ -66,6 +66,10 @@
 #define UT61EP_STATUS_OFFSET	15
 #define UT61EP_STATUS_LEN	3
 
+/* Flags byte 1 (byte[13]) — observed bit fields */
+#define UT61EP_FLAG1_STABLE	(1 << 0)  /* Data valid / stable reading */
+#define UT61EP_FLAG1_OL		(1 << 2)  /* Overload */
+
 /* Flags byte 2 (byte[14]) — observed bit fields */
 #define UT61EP_FLAG2_HOLD	(1 << 0)
 #define UT61EP_FLAG2_REL	(1 << 1)
@@ -79,7 +83,7 @@
 #define UT61EP_UNIT_HZ		4
 #define UT61EP_UNIT_DUTY	5
 #define UT61EP_UNIT_OHM		6
-#define UT61EP_UNIT_OHM2	7
+#define UT61EP_UNIT_OHM2	7	/* Continuity / buzzer mode */
 #define UT61EP_UNIT_V_DIODE	8
 #define UT61EP_UNIT_CAP		9
 #define UT61EP_UNIT_TEMP_C	10
@@ -90,6 +94,7 @@
 #define UT61EP_UNIT_MA_AC	15
 #define UT61EP_UNIT_A_DC	16
 #define UT61EP_UNIT_A_AC	17
+#define UT61EP_UNIT_CONT	18	/* Continuity test */
 #define UT61EP_UNIT_NCV		20
 #define UT61EP_UNIT_LOZ_V	21
 
